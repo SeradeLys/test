@@ -1,0 +1,26 @@
+{
+  "name": "wolfie-butler-server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Backend for Wolfie Butler: Gemini chat, ElevenLabs voice, Photon iMessage agent and Medal clip previews.",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "bot": "node src/photon-bot.js",
+    "bot:local": "node src/photon-bot-local.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.60.0",
+    "@google/genai": "^2.20.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "multer": "^2.0.0"
+  },
+  "optionalDependencies": {
+    "spectrum-ts": "^12.0.0",
+    "@photon-ai/imessage-kit": "^3.0.0"
+  }
+}
