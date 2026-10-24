@@ -1,3 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
 <title>Wolfie Butler</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -438,11 +446,6 @@ const CONFIG = {
     very:      { label:"Very active", desc:"Hard exercise or sports 6–7 days a week", mult:1.725, protein:[1.4,2.2] },
     super:     { label:"Super active", desc:"Very hard exercise, physical work, or intensive training", mult:1.9, protein:[1.4,2.2] }
   },
-  // The app serves a single menu day. Every menu, plan and import is limited to this date.
-  serviceDate: "2026-10-23",
-  // Backend for Gemini chat, ElevenLabs voice, Photon sync and Medal previews (see INTEGRATION_GUIDE.md).
-  // Leave empty on claude.ai; set to e.g. "http://localhost:8787" when you run the included server.
-  apiBase: "",
   // Replace these with your own image paths (an uploaded asset path like "/_blob/<id>", or a data: URI).
   // Leave empty to show the built-in illustration. Developers update these paths directly in code.
   hallImages: { west: "", east: "" },
@@ -758,7 +761,8 @@ const MedalProvider = {
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 function fmt(v, d=0){ if (!NutritionService.isNum(v)) return "N/A"; const r = Math.round(Number(v)*Math.pow(10,d))/Math.pow(10,d); return r.toLocaleString("en-US",{maximumFractionDigits:d}); }
 const range = r => (r && NutritionService.isNum(r.min) && NutritionService.isNum(r.max)) ? (r.min === r.max ? fmt(r.min) : `${fmt(r.min)}–${fmt(r.max)}`) : "N/A";
-const todayISO = () => CONFIG.serviceDate;
+const DEMO_DATE = "2026-10-23"; // TEMPORARY hackathon demo: menu data only exists for this date
+const todayISO = () => DEMO_DATE; // was: real system date via new Date()
 const niceDate = (iso, opt={weekday:"short",month:"short",day:"numeric"}) => { if (!iso) return ""; const [y,m,d] = iso.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("en-US",opt); };
 const hueOf = s => { let h = 0; for (const c of String(s)) h = (h*31 + c.charCodeAt(0)) % 360; return h; };
 const initials = s => String(s).replace(/[^A-Za-z ]/g,"").split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase() || "NP";
@@ -771,7 +775,6 @@ const ICONS = {
   planner:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 15h3"/></svg>',
   recipes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
   heart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-7.5-4.6-9.5-9.3C1 8 3.4 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.6 0 6 3.5 4.5 7.2C19.5 16.4 12 21 12 21z"/></svg>',
-  mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>',
   speaker:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>',
   minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>',
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
@@ -840,7 +843,7 @@ const S = {
 const menuKey = (h,d) => `${h}--${d}`;
 const currentMenu = () => S.menus[menuKey(S.hall, S.date)] || null;
 const datesFor = hall => Object.values(S.menus).filter(m => m.hall === hall).map(m => m.date).sort();
-const allDates = () => [CONFIG.serviceDate];
+const allDates = () => [...new Set([todayISO(), ...Object.values(S.menus).map(m => m.date)])].sort();
 const estimate = () => NutritionService.calculateEstimates(S.profile);
 function targets(){
   const est = estimate(), p = S.profile;
@@ -860,7 +863,7 @@ function persistPlan(){
   S.saveState = "saving"; paintSaveState();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    try { await Store.savePrivate("mealplan", { items:S.plan.items, context:{ hall:S.hall, date:S.date }, updatedAt:new Date().toISOString() }); S.saveState = "saved"; Api.syncProfile(); }
+    try { await Store.savePrivate("mealplan", { items:S.plan.items, context:{ hall:S.hall, date:S.date }, updatedAt:new Date().toISOString() }); S.saveState = "saved"; }
     catch(e){ S.saveState = "error"; toast("Couldn't save your meal to the cloud. It's kept on this device for now."); }
     paintSaveState(); paintNavCounts();
   }, 350);
@@ -893,7 +896,8 @@ function go(v){ if (!VIEWS[v]) v = "overview"; S.view = v; if (v !== "recipes") 
 /* ---------------- Shared view pieces ---------------- */
 function art(seed, glyph, cls=""){ return `<div class="art ${cls}" style="--h:${hueOf(seed)}" aria-hidden="true"><span class="plate"></span><span class="glyph">${esc(glyph)}</span></div>`; }
 function dateSelect(id, hall){
-  return `<span class="input" id="${id}" aria-label="Menu date" style="display:inline-flex;align-items:center;width:auto;min-width:0;font-weight:600;background:var(--surface-2);border-color:var(--line)">${esc(niceDate(CONFIG.serviceDate))}</span>`;
+  const ds = hall ? [...new Set([todayISO(), ...datesFor(hall)])].sort() : allDates();
+  return `<select class="input" id="${id}" data-act="date" aria-label="Menu date" style="width:auto;min-width:170px">${ds.map(d => `<option value="${d}" ${d===S.date?"selected":""}>${esc(niceDate(d))}${S.menus[menuKey(hall||S.hall,d)]?"":" · not loaded"}</option>`).join("")}</select>`;
 }
 function hallSeg(){ return `<div class="seg" role="group" aria-label="Dining hall">${Object.values(CONFIG.halls).map(h => `<button data-act="hall" data-hall="${h.id}" aria-pressed="${S.hall===h.id}">${h.short}</button>`).join("")}</div>`; }
 function notice(text, kind=""){ return `<div class="notice ${kind}">${icon(kind==="info"?"info":"alert")}<div>${text}</div></div>`; }
@@ -986,7 +990,7 @@ VIEWS.menus = () => {
   : `<div class="empty"><h3>No ${esc(h.short)} menu for ${esc(niceDate(S.date))} yet</h3>
       <p style="max-width:52ch">Menus are saved to the cloud once someone imports them from Nutrislice, and then everyone on the team sees them.</p>
       <button class="btn primary" data-act="import">${icon("upload")}Import ${esc(niceDate(S.date,{month:"short",day:"numeric"}))} menu</button>
-</div>`}`;
+      ${loaded.length ? `<p class="small">Loaded dates for ${esc(h.short)}: ${loaded.map(d => `<a href="#menus" data-act="pick-date" data-date="${d}">${esc(niceDate(d))}</a>`).join(", ")}</p>` : ""}</div>`}`;
 };
 function paintMealBar(){
   const el = document.getElementById("mealbar"); if (!el) return;
@@ -1152,7 +1156,7 @@ function recipeCard(r){
 }
 function mediaBlock(r, big){
   const medal = MedalProvider.parse(r.medalUrl);
-  if (medal) return `<div class="player" ${Api.on() ? `data-medal-embed="${esc(medal.url)}"` : ""}>${r.thumbId ? `<img src="/_blob/${esc(r.thumbId)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.6" onerror="this.remove()">` : art(r.title, "")}<div class="inner"><a class="play" href="${esc(medal.url)}" target="_blank" rel="noopener" aria-label="Watch ${esc(r.title)} on Medal">${icon("play")}</a><b>Watch the clip on Medal</b><a class="lnk small" href="${esc(medal.url)}" target="_blank" rel="noopener">${esc(medal.url.replace(/^https:\/\//,""))}</a><span class="xs" style="opacity:.75">Opens on medal.tv in a new tab</span></div></div>`;
+  if (medal) return `<div class="player">${r.thumbId ? `<img src="/_blob/${esc(r.thumbId)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.6" onerror="this.remove()">` : art(r.title, "")}<div class="inner"><a class="play" href="${esc(medal.url)}" target="_blank" rel="noopener" aria-label="Watch ${esc(r.title)} on Medal">${icon("play")}</a><b>Watch the clip on Medal</b><a class="lnk small" href="${esc(medal.url)}" target="_blank" rel="noopener">${esc(medal.url.replace(/^https:\/\//,""))}</a><span class="xs" style="opacity:.75">Opens on medal.tv in a new tab</span></div></div>`;
   return recipeMedia(r, "").replace('class="photo "','class="photo " style="aspect-ratio:16/9;border-radius:var(--r-lg)"');
 }
 VIEWS.recipes = () => {
@@ -1207,8 +1211,7 @@ function paintWidget(){
     ${!S.chat.length ? `<div class="prompts">${["Build me a lunch from this menu.","Explain my meal's nutrition.","Suggest swaps from available foods."].map(p=>`<button class="chip" data-act="prompt" data-p="${esc(p)}">${esc(p)}</button>`).join("")}</div>` : ""}
     <p class="wb-note">Wolfie Butler only uses dishes and nutrition listed in Nutrislice. All values are estimates.</p>
     <form class="composer" data-form="chat"><input class="input" id="chat-in" name="m" autocomplete="off" placeholder="Message Wolfie Butler" aria-label="Message">
-      ${Api.on() ? `<button type="button" class="iconbtn" data-act="mic" aria-pressed="false" title="Talk to Wolfie Butler" aria-label="Voice chat: tap to talk, tap again to send">${icon("mic")}</button>`
-        : canSpeak ? `<button type="button" class="iconbtn" data-act="voice" aria-pressed="${S.voice}" title="${S.voice?"Voice replies on":"Read replies aloud"}" aria-label="Read replies aloud">${icon("speaker")}</button>` : ""}
+      ${canSpeak ? `<button type="button" class="iconbtn" data-act="voice" aria-pressed="${S.voice}" title="${S.voice?"Voice replies on":"Read replies aloud"}" aria-label="Read replies aloud">${icon("speaker")}</button>` : ""}
       <button class="btn primary" type="submit" ${S.chatBusy?"disabled":""} aria-label="Send">${icon("send")}</button></form>
   </section>`;
   paintMsgs();
@@ -1258,7 +1261,6 @@ VIEWS.profile = () => {
       <section class="form-sec"><h2>Basic information</h2>
         <div class="grid g2">
           <div class="field"><label for="pf-name">Display name</label><input class="input" id="pf-name" name="name" value="${esc(p.name)}" placeholder="Iris"></div>
-          ${Api.on() ? `<div class="field"><label for="pf-phone">iMessage number or email</label><input class="input" id="pf-phone" name="phone" value="${esc(p.phone||"")}" placeholder="+1 631 555 0100"><span class="hint">Lets Wolfie Butler on iMessage use your targets and plan.</span></div>` : ""}
           <div class="field"><label for="pf-age">Age</label><input class="input ${e.age?"bad":""}" id="pf-age" name="age" type="number" inputmode="numeric" min="1" max="120" value="${esc(p.age)}">${e.age?`<span class="err">${esc(e.age)}</span>`:""}</div>
           <div class="field"><label for="pf-sex">Gender</label><select class="input" id="pf-sex" name="sex"><option value="">Choose</option><option value="female" ${p.sex==="female"?"selected":""}>Female</option><option value="male" ${p.sex==="male"?"selected":""}>Male</option><option value="other" ${p.sex==="other"?"selected":""}>Prefer not to say</option></select></div>
           <div class="field"><label for="pf-w">Weight</label><div class="unit-row"><input class="input ${e.weight?"bad":""}" id="pf-w" name="weight" type="number" step="0.1" inputmode="decimal" value="${esc(p.weight)}"><select class="input" name="weightUnit" aria-label="Weight unit"><option value="lb" ${p.weightUnit==="lb"?"selected":""}>lb</option><option value="kg" ${p.weightUnit==="kg"?"selected":""}>kg</option></select></div>${e.weight?`<span class="err">${esc(e.weight)}</span>`:""}</div>
@@ -1298,7 +1300,7 @@ VIEWS.profile = () => {
 function readProfileForm(){
   const f = document.getElementById("profile-form"); if (!f) return S.profile;
   const fd = new FormData(f), base = S.draft || { ...(S.profile || EMPTY_PROFILE) };
-  const p = { ...base, name:fd.get("name")?.trim()||"", phone:(fd.get("phone") ?? base.phone ?? "").toString().trim(), age:fd.get("age")||"", sex:fd.get("sex")||"", weight:fd.get("weight")||"", weightUnit:fd.get("weightUnit")||"lb",
+  const p = { ...base, name:fd.get("name")?.trim()||"", age:fd.get("age")||"", sex:fd.get("sex")||"", weight:fd.get("weight")||"", weightUnit:fd.get("weightUnit")||"lb",
     height:fd.get("height")||"", heightUnit:fd.get("heightUnit")||"in", activity:fd.get("activity")||"", goal:fd.get("goal")||"",
     targetWeight:fd.get("targetWeight")||"", timeframeWeeks:fd.get("timeframeWeeks")||"", rapidChange:!!fd.get("rapidChange"),
     custom:{ cal:fd.get("c_cal")||"", protein:fd.get("c_protein")||"", carbs:fd.get("c_carbs")||"", fat:fd.get("c_fat")||"", fiber:fd.get("c_fiber")||"" } };
@@ -1370,7 +1372,7 @@ function importModal(){
   const h = CONFIG.halls[S.hall];
   openOverlay(`<div style="display:flex;align-items:flex-start;gap:12px"><div><h2>Import a Nutrislice menu</h2><p class="small muted" style="margin-top:4px">It's saved to the cloud, so everyone using Wolfie Butler sees it.</p></div><button class="iconbtn x" data-act="close" aria-label="Close">${icon("x")}</button></div>
     <div class="field"><label for="im-hall">Dining hall</label><select class="input" id="im-hall">${Object.values(CONFIG.halls).map(x=>`<option value="${x.id}" ${x.id===S.hall?"selected":""}>${x.name}</option>`).join("")}</select></div>
-    <p class="small muted">Only the ${esc(niceDate(CONFIG.serviceDate,{weekday:"long",month:"long",day:"numeric"}))} menu is kept. Other days in the JSON are ignored.</p>
+    <div class="field"><label for="im-date">Week containing</label><input class="input" id="im-date" type="date" value="${S.date}"></div>
     <ol class="small" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
       <li><a id="im-link" href="${esc(nutrisliceUrl(S.hall,S.date))}" target="_blank" rel="noopener">Open the ${esc(h.short)} menu API ${icon("ext").replace('<svg','<svg style="width:13px;height:13px;vertical-align:-1px"')}</a> in a new tab.</li>
       <li>Select all of the page (Ctrl+A or ⌘A) and copy it.</li><li>Paste it below, or upload a saved .json file.</li></ol>
@@ -1407,51 +1409,8 @@ const PhotonBridge = {
     return lines.join("\n");
   }
 };
-const Api = {
-  on: () => !!CONFIG.apiBase,
-  url: path => CONFIG.apiBase.replace(/\/$/, "") + path,
-  async json(path, body){ const r = await fetch(this.url(path), { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText); return r.json(); },
-  async speak(text){ try { const r = await fetch(this.url("/api/tts"), { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ text }) }); if (!r.ok) throw 0; const a = new Audio(URL.createObjectURL(await r.blob())); await a.play(); } catch { speak(text); } },
-  syncProfile(){ const p = S.profile; if (!this.on() || !p?.phone) return; this.json("/api/profile", { phone:p.phone, profile:p, targets:targets(), plan:S.plan.items }).catch(() => {}); }
-};
-let micRec = null;
-async function toggleMic(btn){
-  if (micRec) { micRec.stop(); return; }
-  let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio:true }); } catch { toast("Microphone access was blocked."); return; }
-  const chunks = [], rec = new MediaRecorder(stream); micRec = rec;
-  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-  rec.onstop = async () => {
-    stream.getTracks().forEach(t => t.stop()); micRec = null; btn.setAttribute("aria-pressed", "false");
-    const fd = new FormData(); fd.append("audio", new Blob(chunks, { type: rec.mimeType || "audio/webm" }), "voice.webm");
-    toast("Transcribing…");
-    try { const r = await fetch(Api.url("/api/stt"), { method:"POST", body:fd }); const { text } = await r.json(); if (text && text.trim()) AgentService.send(text.trim(), { spoken:true }); else toast("I didn't catch that. Try again."); }
-    catch { toast("Voice transcription failed. Check the server."); }
-  };
-  rec.start(); btn.setAttribute("aria-pressed", "true"); toast("Listening… tap the mic again to send");
-}
-function hydrateMedal(){
-  if (!Api.on()) return;
-  document.querySelectorAll("[data-medal-embed]").forEach(async el => {
-    const url = el.dataset.medalEmbed; el.removeAttribute("data-medal-embed");
-    try { const r = await fetch(Api.url("/api/medal/embed?url=" + encodeURIComponent(url))); const { src } = await r.json();
-      if (src && /^https:\/\/([a-z0-9-]+\.)*(medal\.tv|embedly\.com|embed\.ly)\//i.test(src)) el.outerHTML = `<div class="player" style="background:#000"><iframe src="${esc(src)}" title="Medal clip" allow="autoplay; fullscreen" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe></div>`; } catch {}
-  });
-}
 const AgentService = {
   ctl:null,
-  async sendViaServer(text, opts){
-    const turns = S.chat.filter(m => !m.local).slice(-12).map(m => ({ role:m.role, content:m.content }));
-    try {
-      const { reply, actions } = await Api.json("/api/chat", { messages:turns, context:JSON.parse(this.context()) });
-      const bot = { role:"assistant", content: reply || "Sorry, I couldn't answer that.", acts:[] };
-      (actions || []).forEach(a => { if (a.type !== "add_to_meal") return; const m = S.menus[menuKey(a.hallId, S.date)]; const f = m?.items.find(i => i.id === String(a.dishId)); if (!f) return;
-        MealPlanService.add(S.plan, f, a.hallId, S.date, Math.max(1, parseInt(a.servings) || 1), PERIODS.includes(a.period) ? a.period : defaultPeriod(f.station)); bot.acts.push(`Added ${f.name} to your plan`); });
-      if (bot.acts.length) { persistPlan(); if (S.view === "planner" || S.view === "overview") render(); }
-      S.chat.push(bot);
-      if (opts?.spoken || S.voice) Api.speak(bot.content);
-    } catch(e) { S.chat.push({ role:"assistant", content:"Wolfie Butler couldn't reach the server. Check that it's running and that CONFIG.apiBase is right.", local:true }); }
-    S.chatBusy = false; paintMsgs(); paintComposer(); paintNavCounts();
-  },
   context(){
     const compact = m => m ? m.items.map(i => ({ id:i.id, station:i.station, name:i.name, kcal:i.nutr.cal, protein_g:i.nutr.protein, carbs_g:i.nutr.carbs, fat_g:i.nutr.fat, fiber_g:i.nutr.fiber, labels:i.labels, allergens:i.allergens.length?i.allergens:"not listed" })) : "not loaded";
     const t = targets(), n = NutritionService.calculateMealNutrition(S.plan.items);
@@ -1473,10 +1432,9 @@ Rules:
 - If a menu is "not loaded", tell them to import it on the Dining menus page.
 CONTEXT:
 ${this.context()}`; },
-  async send(text, opts){
+  async send(text){
     const sample = await (window.claude?.use ? window.claude.use("sample").catch(()=>null) : null);
     S.chat.push({ role:"user", content:text }); S.chatBusy = true; paintMsgs(); paintComposer();
-    if (Api.on()) return this.sendViaServer(text, opts);
     if (!sample) { S.chat.push({ role:"assistant", content:"The agent isn't available in this view. Open Wolfie Butler in Claude while signed in to chat. You can still copy the agent brief for your Photon iMessage agent." }); S.chatBusy = false; paintMsgs(); paintComposer(); return; }
     const turns = S.chat.filter(m => !m.local).slice(-12).map(m => ({ role:m.role, content:m.content }));
     const bot = { role:"assistant", content:"", streaming:true, acts:[] }; let pushed = false;
@@ -1506,7 +1464,7 @@ function render(){
   document.getElementById("view").innerHTML = VIEWS[S.view]();
   if (S.view === "menus") { paintFoodGrid(); paintSideList(); paintMealBar(); }
 
-  paintSaveState(); hydrateMedal();
+  paintSaveState();
 }
 
 /* ---------------- Events ---------------- */
@@ -1520,6 +1478,7 @@ document.addEventListener("click", async e => {
     case "scrim": case "close": closeOverlay(); break;
     case "hall": S.hall = a.dataset.hall; S.station = "All"; S.label = "All"; S.recs = null; render(); break;
     case "open-hall": S.hall = a.dataset.hall; S.station = "All"; go("menus"); break;
+    case "pick-date": e.preventDefault(); S.date = a.dataset.date; render(); break;
     case "station": S.station = a.dataset.station; document.querySelectorAll('[data-act="station"]').forEach(c => c.setAttribute("aria-pressed", c.dataset.station === S.station)); paintFoodGrid(); break;
     case "import": importModal(); break;
     case "period": S.period = a.dataset.p; S.recs = null; render(); break;
@@ -1549,7 +1508,6 @@ document.addEventListener("click", async e => {
       if (!n) break; persistPlan(); render(); paintNavCounts(); toast(`Added ${n} dish${n>1?"es":""} · ${planCount()} selected`); break; }
     case "wb-open": openWidget(); setTimeout(() => document.getElementById("chat-in")?.focus(), 650); break;
     case "wb-close": closeWidget(); break;
-    case "mic": toggleMic(a); break;
     case "voice": S.voice = !S.voice; a.setAttribute("aria-pressed", S.voice); a.title = S.voice ? "Voice replies on" : "Read replies aloud"; if (!S.voice) { try { speechSynthesis.cancel(); } catch {} } else speak("Voice replies are on."); toast(S.voice ? "Wolfie Butler will read replies aloud" : "Voice replies off"); break;
     case "plan-food": { const it = S.plan.items.find(i => i.key === a.dataset.key); if (it) foodDrawer({ id:it.foodId, name:it.name, station:it.station, serving:it.serving, nutr:it.nutr, labels:it.labels||[], allergens:it.allergens||[], desc:"" }, true); break; }
     case "dq": { const o = document.getElementById("dq"), n = Math.max(1, (+o.textContent) + (+a.dataset.d)); o.textContent = n; break; }
@@ -1584,12 +1542,13 @@ document.addEventListener("click", async e => {
 });
 document.addEventListener("change", e => {
   const t = e.target;
+  if (t.dataset.act === "date") { S.date = t.value; S.recs = null; S.station = "All"; render(); }
   if (t.id === "menu-label") { S.label = t.value; paintFoodGrid(); }
   if (t.id === "menu-station") { S.station = t.value; paintFoodGrid(); }
   if (t.dataset.ms === "label") { const set = new Set(S.labels); t.checked ? set.add(t.value) : set.delete(t.value); S.labels = [...set]; const tx = document.getElementById("ms-labels-txt"); if (tx) tx.textContent = msText(); paintFoodGrid(); }
   if (t.id === "use-favs") { S.useFavs = t.checked; render(); }
   if (t.dataset.upload && t.files && t.files[0]) uploadImage(t);
-  if (t.id === "im-hall") { const h = document.getElementById("im-hall").value, d = CONFIG.serviceDate; const l = document.getElementById("im-link"); l.href = nutrisliceUrl(h, d); l.firstChild.textContent = `Open the ${CONFIG.halls[h].short} menu API `; }
+  if (t.id === "im-hall" || t.id === "im-date") { const h = document.getElementById("im-hall").value, d = document.getElementById("im-date").value || S.date; const l = document.getElementById("im-link"); l.href = nutrisliceUrl(h, d); l.firstChild.textContent = `Open the ${CONFIG.halls[h].short} menu API `; }
   if (t.id === "im-file" && t.files[0]) { const r = new FileReader(); r.onload = () => { document.getElementById("im-json").value = r.result; }; r.readAsText(t.files[0]); }
   if (t.closest("#profile-form")) { S.draft = { ...readProfileForm(), diet:S.draft?.diet ?? S.profile?.diet ?? [], allergies:S.draft?.allergies ?? S.profile?.allergies ?? [], targetMode:S.draft?.targetMode ?? S.profile?.targetMode ?? "estimated" }; refreshProfileSide(S.draft); }
 });
@@ -1610,7 +1569,7 @@ document.addEventListener("submit", async e => {
     const v = NutritionService.validate(p); S.profileErrors = v.errors;
     if (!v.ok) { S.draft = p; render(); document.querySelector(".input.bad")?.focus(); return; }
     S.profile = p; S.draft = null;
-    try { await Store.savePrivate("profile", p); Api.syncProfile(); toast("Profile saved"); } catch { toast("Couldn't save to the cloud. It's kept on this device."); }
+    try { await Store.savePrivate("profile", p); toast("Profile saved"); } catch { toast("Couldn't save to the cloud. It's kept on this device."); }
     go("overview");
   }
   if (f.dataset.form === "medal") {
@@ -1666,22 +1625,21 @@ async function uploadImage(input){
 async function doImport(){
   const msg = document.getElementById("im-msg"), hall = document.getElementById("im-hall").value, raw = document.getElementById("im-json").value;
   if (!raw.trim()) { msg.innerHTML = `<span class="err">Paste the menu JSON first.</span>`; return; }
-  let days; try { days = MenuProvider.parse(raw, hall).filter(d => d.date === CONFIG.serviceDate); } catch(err) { msg.innerHTML = `<span class="err">${esc(err.message)}</span>`; return; }
-  if (!days.length) { msg.innerHTML = `<span class="err">This JSON has no menu for ${esc(niceDate(CONFIG.serviceDate))}. Open the API link above, which is set to that date.</span>`; return; }
+  let days; try { days = MenuProvider.parse(raw, hall); } catch(err) { msg.innerHTML = `<span class="err">${esc(err.message)}</span>`; return; }
   msg.textContent = `Saving ${days.length} day${days.length>1?"s":""}…`;
   const srcDate = days[0].date;
   try {
     for (const d of days) await Store.saveShared("menus", menuKey(hall, d.date), { ...d, importedAt:new Date().toISOString(), source:"Nutrislice", sourceUrl:nutrisliceUrl(hall, srcDate) });
     days.forEach(d => { S.menus[menuKey(hall,d.date)] = { ...d, importedAt:new Date().toISOString() }; });
-    closeOverlay(); S.hall = hall;
-    toast(`Imported ${days[0].items.length} dishes for ${niceDate(CONFIG.serviceDate)}`); render();
+    closeOverlay(); S.hall = hall; if (!S.menus[menuKey(hall,S.date)]) S.date = days.find(d => d.date >= todayISO())?.date || days[0].date;
+    toast(`Imported ${days.reduce((a,d)=>a+d.items.length,0)} dishes across ${days.length} day${days.length>1?"s":""}`); render();
   } catch(err) { msg.innerHTML = `<span class="err">${esc(err?.code === "invalid_argument" ? "You don't have permission to save menus to this app. Ask the owner for Contributor access." : err?.code === "quota_exceeded" ? "The cloud database is full. Delete old menus and try again." : "Couldn't save to the cloud. Try again in a moment.")}</span>`; }
 }
 
 /* ---------------- Boot ---------------- */
 function migratePlan(items){
   const out = [];
-  items.filter(i => i && i.name && i.foodId && i.date === CONFIG.serviceDate).forEach(i => { const period = PERIODS.includes(i.period) ? i.period : (periodOf(i.station || "") !== "All day" ? periodOf(i.station || "") : "Lunch");
+  items.filter(i => i && i.name && i.foodId).forEach(i => { const period = PERIODS.includes(i.period) ? i.period : (periodOf(i.station || "") !== "All day" ? periodOf(i.station || "") : "Lunch");
     const key = MealPlanService.key(i.hall, i.date, i.foodId, period); const ex = out.find(x => x.key === key); if (ex) ex.servings += i.servings; else out.push({ ...i, period, key }); });
   return out;
 }
@@ -1700,7 +1658,8 @@ function migratePlan(items){
     if (prof && typeof prof === "object") S.profile = { ...EMPTY_PROFILE, ...prof };
     if (plan && Array.isArray(plan.items)) { S.plan = { items: migratePlan(plan.items) }; if (plan.context && CONFIG.halls[plan.context.hall]) S.hall = plan.context.hall; }
   } catch {}
-  Store.watch("menus", docs => { S.menus = {}; docs.forEach(d => { if (d && d.hall && d.date === CONFIG.serviceDate && Array.isArray(d.items)) S.menus[menuKey(d.hall,d.date)] = d; });
+  Store.watch("menus", docs => { S.menus = {}; docs.forEach(d => { if (d && d.hall && d.date && Array.isArray(d.items)) S.menus[menuKey(d.hall,d.date)] = d; });
+    if (!currentMenu()) { const ds = datesFor(S.hall); const pick = ds.find(d => d >= todayISO()) || ds.at(-1); if (pick && !S.menus[menuKey(S.hall,todayISO())]) S.date = pick; }
     if (!document.querySelector(".scrim") && !document.activeElement?.closest?.("form,#menu-q")) render(); else if (S.view === "menus") paintFoodGrid(); });
   Store.watch("site", docs => { S.site = docs.find(d => d._id === "config") || {}; if (S.view === "overview" && !document.querySelector(".scrim")) render(); if (!S.chatOpen) paintWidget(); });
   Store.watch("recipes", docs => { S.recipes = docs.filter(r => r && r.title).sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || String(a.title).localeCompare(b.title));
@@ -1708,3 +1667,6 @@ function migratePlan(items){
   paintNav(); render(); if (!document.querySelector("#wolfie .wb-panel.opening")) paintWidget(); else setTimeout(() => { if (S.chatOpen && !wbClosing) paintWidget(); }, 650);
 })();
 </script>
+
+</body>
+</html>
